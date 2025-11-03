@@ -39,10 +39,10 @@ function Dashboard({ kpiData }) {
       <TrafficLightStatus />
 
       {/* 4. Vista de Cámara */}
-      <CameraView />
+      <TrafficVolumeChart />
 
       {/* 5. Gráfico de Tráfico */}
-      <TrafficVolumeChart />
+      <CameraView />
 
     </div>
   );
