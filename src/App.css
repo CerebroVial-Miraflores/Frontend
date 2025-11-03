@@ -24,6 +24,17 @@
   color: white;
 }
 
+/* En tu archivo style.css global */
+
+/* ... (todas tus variables :root y estilos de body) ... */
+
+.main-content {
+  /* Esto añade espacio alrededor del contenido de tu página */
+  padding: 2rem;
+  max-width: 1400px;
+  margin: auto;
+}
+
 .App-link {
   color: #61dafb;
 }
