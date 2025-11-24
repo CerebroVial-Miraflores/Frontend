@@ -154,7 +154,11 @@
 }
 
 .table-wrapper {
-    overflow-x: auto; /* Para tablas anchas */
+    /* Hacemos que el contenedor sea escroleable verticalmente */
+    overflow-y: auto; 
+    /* Le damos una altura máxima. 
+       Aprox. 5 filas (5 * (24px padding + 16px font)) + cabecera. */
+    max-height: 260px; 
 }
 
 .table-area table {

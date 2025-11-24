@@ -12,7 +12,7 @@ function TrafficVolumeChart() {
   // autoplay=1: Intenta iniciar automáticamente (requiere mute=1)
   // mute=1: Inicia en silencio
   // controls=0: Oculta los controles de YouTube
-  const embedUrl = "http://localhost:8080/video_feed";
+  const embedUrl = "http://localhost:8080/video_feed"; 
 
   return (
     // Usamos la misma <section> que ya tenías
