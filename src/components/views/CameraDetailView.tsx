@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Car, Activity, Zap, Users, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Car, Activity, Zap, Users, AlertTriangle, Camera } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 
@@ -9,40 +9,122 @@ interface CameraDetailViewProps {
 }
 
 export const CameraDetailView = ({ cameraId, onBack }: CameraDetailViewProps) => {
-    // Mock data based on ID (in a real app, fetch this data)
+    const [metrics, setMetrics] = React.useState({
+        vehiclesPerHour: 0,
+        avgSpeed: 0,
+        congestionLevel: 'Bajo',
+        density: '0%',
+        pedestrians: 0,
+        incidents: 0
+    });
+
+    const [viewMode, setViewMode] = React.useState<'raw' | 'processed'>('raw');
+
+    const formattedCameraId = `CAM_${cameraId.toString().padStart(3, '0')}`;
+
+    React.useEffect(() => {
+        // Connect to SSE stream
+        const eventSource = new EventSource(`http://localhost:8000/stream/${formattedCameraId}`);
+
+        eventSource.addEventListener('analysis', (event) => {
+            try {
+                console.log("SSE Message received:", event.data);
+                const data = JSON.parse(event.data);
+                console.log("Parsed SSE Data:", data);
+                setMetrics({
+                    vehiclesPerHour: data.total_vehicles || 0,
+                    avgSpeed: data.avg_speed || 0,
+                    congestionLevel: data.congestion_level || 'Bajo',
+                    density: data.density || '0%',
+                    pedestrians: data.pedestrians || 0,
+                    incidents: data.incidents || 0
+                });
+            } catch (e) {
+                console.error("Error parsing SSE data", e);
+            }
+        });
+
+        eventSource.onerror = (e) => {
+            console.error("SSE Error:", e);
+        };
+
+        return () => {
+            eventSource.close();
+        };
+    }, [formattedCameraId]);
+
     const cameraData = {
         id: cameraId,
         name: cameraId === 1 ? 'Av. Larco / Av. Benavides' :
             cameraId === 2 ? 'Av. Pardo / Av. Espinar' :
                 cameraId === 3 ? 'Av. Arequipa / Av. Angamos' : 'Ovalo Gutiérrez',
         status: cameraId === 1 ? 'critical' : cameraId === 2 ? 'moderate' : 'good',
-        streamUrl: 'https://images.unsplash.com/photo-1566008885218-90abf9200ddb?q=80&w=2832&auto=format&fit=crop', // Placeholder image
-        metrics: {
-            vehiclesPerHour: 1245,
-            avgSpeed: 22,
-            congestionLevel: 'Alta',
-            density: '85%',
-            pedestrians: 450,
-            incidents: 2
+        streamUrl: `http://localhost:8000/video/${formattedCameraId}?type=${viewMode}`,
+        metrics: metrics
+    };
+
+    const getCongestionStyles = (level: string) => {
+        switch (level.toLowerCase()) {
+            case 'alto':
+                return { width: '100%', color: 'bg-red-500', text: 'text-red-400' };
+            case 'moderado':
+                return { width: '66%', color: 'bg-amber-500', text: 'text-amber-400' };
+            case 'bajo':
+            default:
+                return { width: '33%', color: 'bg-emerald-500', text: 'text-emerald-400' };
         }
     };
 
+    const congestionStyle = getCongestionStyles(cameraData.metrics.congestionLevel);
+
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="h-full flex flex-col gap-6 animate-fade-in">
             {/* Header */}
-            <div className="flex items-center gap-4">
-                <button
-                    onClick={onBack}
-                    className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
-                >
-                    <ArrowLeft size={20} />
-                </button>
-                <div>
-                    <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                        {cameraData.name}
-                        <Badge status={cameraData.status} />
-                    </h2>
-                    <p className="text-slate-400 text-sm">ID Cámara: CAM-0{cameraId} • Ubicación: Miraflores, Lima</p>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={onBack}
+                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors"
+                    >
+                        <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <div>
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                            {cameraData.name}
+                            <Badge status={cameraData.status} />
+                        </h2>
+                        <div className="flex items-center gap-2 text-slate-400 text-sm mt-1">
+                            <Camera className="w-4 h-4" />
+                            <span>ID: {cameraData.id}</span>
+                            <span>•</span>
+                            <span className="flex items-center gap-1 text-emerald-400">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                En vivo
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* View Mode Toggle */}
+                <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
+                    <button
+                        onClick={() => setViewMode('raw')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'raw'
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'text-slate-400 hover:text-white'
+                            }`}
+                    >
+                        Vista Original
+                    </button>
+                    <button
+                        onClick={() => setViewMode('processed')}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'processed'
+                            ? 'bg-indigo-600 text-white shadow-lg'
+                            : 'text-slate-400 hover:text-white'
+                            }`}
+                    >
+                        Vista Procesada
+                    </button>
                 </div>
             </div>
 
@@ -69,10 +151,6 @@ export const CameraDetailView = ({ cameraId, onBack }: CameraDetailViewProps) =>
                                 className="w-full h-full object-cover opacity-80"
                             />
 
-                            {/* Bounding Box Overlay Simulation */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-emerald-400/50 rounded pointer-events-none">
-                                <div className="absolute -top-6 left-0 bg-emerald-500 text-black text-[10px] font-bold px-1 rounded">VEHICLE 98%</div>
-                            </div>
                         </div>
 
                         <div className="p-4 bg-slate-900 border-t border-slate-800 flex justify-between items-center">
@@ -134,10 +212,13 @@ export const CameraDetailView = ({ cameraId, onBack }: CameraDetailViewProps) =>
                             <div>
                                 <div className="flex justify-between text-xs text-slate-400 mb-1">
                                     <span>Congestión</span>
-                                    <span className="text-amber-400 font-bold">{cameraData.metrics.congestionLevel}</span>
+                                    <span className={`${congestionStyle.text} font-bold`}>{cameraData.metrics.congestionLevel}</span>
                                 </div>
                                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div className="bg-amber-500 h-full w-[75%]"></div>
+                                    <div
+                                        className={`${congestionStyle.color} h-full transition-all duration-500`}
+                                        style={{ width: congestionStyle.width }}
+                                    ></div>
                                 </div>
                             </div>
                             <div>
@@ -146,7 +227,10 @@ export const CameraDetailView = ({ cameraId, onBack }: CameraDetailViewProps) =>
                                     <span className="text-white font-bold">{cameraData.metrics.density}</span>
                                 </div>
                                 <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                                    <div className="bg-indigo-500 h-full w-[85%]"></div>
+                                    <div
+                                        className="bg-indigo-500 h-full transition-all duration-500"
+                                        style={{ width: cameraData.metrics.density }}
+                                    ></div>
                                 </div>
                             </div>
                         </div>
