@@ -4,7 +4,7 @@ import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 
 interface CameraDetailViewProps {
-    cameraId: number;
+    cameraId: string;
     onBack: () => void;
 }
 
@@ -18,9 +18,11 @@ export const CameraDetailView = ({ cameraId, onBack }: CameraDetailViewProps) =>
         incidents: 0
     });
 
-    const [viewMode, setViewMode] = React.useState<'raw' | 'processed'>('raw');
+    const [viewMode, setViewMode] = React.useState<'raw' | 'processed'>('processed');
 
-    const formattedCameraId = `CAM_${cameraId.toString().padStart(3, '0')}`;
+    // cameraId comes as "CAM_001", so we use it directly.
+    // If it were a number, we would pad it. But now we enforce string.
+    const formattedCameraId = cameraId;
 
     React.useEffect(() => {
         // Connect to SSE stream
@@ -55,10 +57,10 @@ export const CameraDetailView = ({ cameraId, onBack }: CameraDetailViewProps) =>
 
     const cameraData = {
         id: cameraId,
-        name: cameraId === 1 ? 'Av. Larco / Av. Benavides' :
-            cameraId === 2 ? 'Av. Pardo / Av. Espinar' :
-                cameraId === 3 ? 'Av. Arequipa / Av. Angamos' : 'Ovalo Gutiérrez',
-        status: cameraId === 1 ? 'critical' : cameraId === 2 ? 'moderate' : 'good',
+        name: cameraId === 'CAM_001' ? 'Av. Larco / Av. Benavides' :
+            cameraId === 'CAM_002' ? 'Av. Pardo / Av. Espinar' :
+                cameraId === 'CAM_003' ? 'Av. Arequipa / Av. Angamos' : 'Ovalo Gutiérrez',
+        status: cameraId === 'CAM_001' ? 'critical' : cameraId === 'CAM_002' ? 'moderate' : 'good',
         streamUrl: `http://localhost:8000/video/${formattedCameraId}?type=${viewMode}`,
         metrics: metrics
     };

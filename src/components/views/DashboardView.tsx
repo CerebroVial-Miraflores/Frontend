@@ -1,25 +1,73 @@
-import React from 'react';
-import { Car, TrendingDown, Activity, ShieldCheck, TrendingUp, Settings, Video, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Car, TrendingDown, Activity, ShieldCheck, Video, AlertTriangle, Filter, Download } from 'lucide-react';
 import { Card } from '../ui/Card';
-import { Badge } from '../ui/Badge';
+import { MapContainer, TileLayer, Marker, Popup, useMap, Tooltip } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 
-// --- DATOS MOCK ---
-const intersections = [
-    { id: 1, name: 'Av. Larco / Av. Benavides', status: 'critical', speed: 12, flow: 45, cam: 'CAM-01', prediction: 'Alta Congestión en 5 min' },
-    { id: 2, name: 'Av. Pardo / Av. Espinar', status: 'moderate', speed: 25, flow: 28, cam: 'CAM-02', prediction: 'Estable' },
-    { id: 3, name: 'Av. Arequipa / Av. Angamos', status: 'good', speed: 35, flow: 15, cam: 'CAM-03', prediction: 'Fluido' },
-    { id: 4, name: 'Ovalo Gutiérrez', status: 'moderate', speed: 22, flow: 30, cam: 'CAM-04', prediction: 'Tendencia al alza' },
-];
+// Fix for default marker icon in React Leaflet
+import icon from 'leaflet/dist/images/marker-icon.png';
+import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
-const alerts = [
-    { id: 1, type: 'Congestión', msg: 'Nivel crítico detectado en Av. Larco', time: 'Hace 2 min', details: 'Velocidad flujo < 10km/h por más de 5 minutos.' },
-    { id: 2, type: 'IA', msg: 'Predicción: Bloqueo en 10 min (Pardo)', time: 'Hace 5 min', details: 'Modelo GRU detecta patrón de saturación inminente.' },
-    { id: 3, type: 'Hardware', msg: 'Latencia alta en Nodo Edge #4', time: 'Hace 12 min', details: 'Ping > 500ms en dispositivo Raspberry Pi intersección 4.' },
-];
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41]
+});
 
-export const DashboardView = ({ onSelectCamera }: { onSelectCamera: (id: number) => void }) => {
+L.Marker.prototype.options.icon = DefaultIcon;
+
+// Component to handle map movement
+function MapUpdater({ center, zoom }: { center: [number, number], zoom: number }) {
+    const map = useMap();
+    map.flyTo(center, zoom);
+    return null;
+}
+
+export const DashboardView = ({ onSelectCamera }: { onSelectCamera: (id: string) => void }) => {
+    // Datos simulados de intersecciones con coordenadas reales de Miraflores
+    const intersections = [
+        { id: 'CAM_001', name: 'Av. Larco / Av. Benavides', speed: 45, flow: 120, status: 'moderate', prediction: 'Estable', lat: -12.126, lng: -77.028 },
+        { id: 'CAM_002', name: 'Av. Pardo / Av. Espinar', speed: 28, flow: 180, status: 'critical', prediction: 'Congestión', lat: -12.119, lng: -77.035 },
+        { id: 'CAM_003', name: 'Av. Arequipa / Av. Angamos', speed: 55, flow: 90, status: 'fluid', prediction: 'Fluido', lat: -12.112, lng: -77.031 },
+        { id: 'CAM_004', name: 'Ovalo Gutiérrez', speed: 32, flow: 150, status: 'moderate', prediction: 'Lento', lat: -12.114, lng: -77.042 },
+    ];
+
+    const [mapCenter, setMapCenter] = useState<[number, number]>([-12.122, -77.028]);
+    const [mapZoom, setMapZoom] = useState(14);
+    const [viewMode, setViewMode] = useState<'leaflet' | 'waze'>('leaflet');
+
+    const handleCameraSelect = (id: string) => {
+        const camera = intersections.find(c => c.id === id);
+        if (camera) {
+            setMapCenter([camera.lat, camera.lng]);
+            setMapZoom(16);
+            if (viewMode === 'waze') setViewMode('leaflet'); // Switch to leaflet to show specific camera
+            onSelectCamera(id);
+        }
+    };
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-fade-in">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold text-white mb-2">Centro de Control de Tráfico</h1>
+                    <p className="text-slate-400">Monitoreo en tiempo real y gestión de incidentes</p>
+                </div>
+                <div className="flex gap-3">
+                    <button className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors border border-slate-700">
+                        <Filter size={18} />
+                        Filtros
+                    </button>
+                    <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-lg shadow-indigo-500/20">
+                        <Download size={18} />
+                        Exportar Reporte
+                    </button>
+                </div>
+            </div>
+
             {/* FILA DE KPIs */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="bg-gradient-to-br from-indigo-900/40 to-slate-800/40 border-indigo-500/20">
@@ -56,98 +104,153 @@ export const DashboardView = ({ onSelectCamera }: { onSelectCamera: (id: number)
                 </Card>
             </div>
 
-            {/* ÁREA PRINCIPAL: MAPA Y LISTA */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-                {/* Contenedor del Mapa */}
-                <Card className="lg:col-span-2 relative p-0 overflow-hidden group">
-                    <div className="absolute top-4 left-4 z-10 bg-slate-900/90 backdrop-blur px-3 py-1 rounded border border-slate-700 text-xs text-white">
-                        Vista Satelital: Miraflores Centro
+            {/* Main Grid */}
+            <div className="grid grid-cols-12 gap-6 h-[600px]">
+                {/* Map Section */}
+                <div className="col-span-8 bg-slate-800 rounded-xl border border-slate-700 overflow-hidden relative shadow-2xl flex flex-col">
+                    {/* Map Header / Toggle */}
+                    <div className="absolute top-4 left-4 z-[400] flex gap-2">
+                        <div className="bg-slate-900/90 backdrop-blur px-3 py-1 rounded-full border border-slate-700 text-xs text-white font-medium shadow-lg flex items-center gap-2">
+                            <span>Vista:</span>
+                            <div className="flex bg-slate-800 rounded p-0.5">
+                                <button
+                                    onClick={() => setViewMode('leaflet')}
+                                    className={`px-2 py-0.5 rounded text-[10px] transition-colors ${viewMode === 'leaflet' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Interactivo
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('waze')}
+                                    className={`px-2 py-0.5 rounded text-[10px] transition-colors ${viewMode === 'waze' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Waze / Tráfico
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    {/* Mapa Simulado */}
-                    <div className="w-full h-full bg-slate-800 relative">
-                        <div className="absolute inset-0 opacity-20"
-                            style={{ backgroundImage: 'radial-gradient(#4f46e5 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
-                        {/* Simulación de Calles */}
-                        <div className="absolute top-1/2 left-0 w-full h-2 bg-slate-700/50 transform -translate-y-1/2"></div>
-                        <div className="absolute top-0 left-1/3 w-2 h-full bg-slate-700/50 transform rotate-12"></div>
-                        <div className="absolute top-0 right-1/4 w-2 h-full bg-slate-700/50"></div>
-
-                        {/* Marcadores de Intersección */}
-                        {intersections.map((int) => (
-                            <div key={int.id} className="absolute group cursor-pointer"
-                                style={{ top: `${20 + int.id * 15}%`, left: `${15 + int.id * 18}%` }}
-                                onClick={() => onSelectCamera(int.id)}
+                    {/* Map Content */}
+                    <div className="w-full h-full bg-slate-900 relative z-0">
+                        {viewMode === 'leaflet' ? (
+                            <MapContainer
+                                center={[-12.122, -77.028]}
+                                zoom={14}
+                                style={{ height: '100%', width: '100%' }}
+                                zoomControl={false}
                             >
-                                <div className={`w-4 h-4 rounded-full ${int.status === 'critical' ? 'bg-red-500 animate-ping' : 'bg-emerald-500'} absolute`}></div>
-                                <div className={`relative w-4 h-4 rounded-full border-2 border-white ${int.status === 'critical' ? 'bg-red-500' : int.status === 'moderate' ? 'bg-yellow-500' : 'bg-emerald-500'}`}></div>
+                                <TileLayer
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                />
+                                <MapUpdater center={mapCenter} zoom={mapZoom} />
 
-                                {/* Tooltip al pasar el mouse */}
-                                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-48 bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 pointer-events-none">
-                                    <h4 className="font-bold text-white text-xs mb-1">{int.name}</h4>
-                                    <div className="flex justify-between text-[10px] text-slate-400">
-                                        <span>Vel: {int.speed} km/h</span>
-                                        <span>Flujo: {int.flow} vpm</span>
+                                {intersections.map((int) => {
+                                    // Determine color based on status
+                                    let colorClass = 'bg-emerald-500';
+                                    let pulseClass = '';
+                                    if (int.status === 'critical') {
+                                        colorClass = 'bg-red-500';
+                                        pulseClass = 'animate-ping';
+                                    } else if (int.status === 'moderate') {
+                                        colorClass = 'bg-amber-500';
+                                    }
+
+                                    // Create custom icon
+                                    const customIcon = L.divIcon({
+                                        className: 'custom-marker',
+                                        html: `<div class="relative flex items-center justify-center w-6 h-6">
+                                                 <span class="absolute inline-flex h-full w-full rounded-full ${colorClass} opacity-75 ${pulseClass}"></span>
+                                                 <span class="relative inline-flex rounded-full h-4 w-4 ${colorClass} border-2 border-white shadow-lg"></span>
+                                               </div>`,
+                                        iconSize: [24, 24],
+                                        iconAnchor: [12, 12]
+                                    });
+
+                                    return (
+                                        <Marker
+                                            key={int.id}
+                                            position={[int.lat, int.lng]}
+                                            icon={customIcon}
+                                            eventHandlers={{
+                                                click: () => handleCameraSelect(int.id),
+                                            }}
+                                        >
+                                            <Tooltip direction="top" offset={[0, -12]} opacity={1} permanent={false}>
+                                                <div className="text-center">
+                                                    <div className="font-bold text-slate-900 text-xs">{int.name}</div>
+                                                    <div className="text-[10px] text-slate-600">
+                                                        {int.speed} km/h • {int.flow} vpm
+                                                    </div>
+                                                </div>
+                                            </Tooltip>
+                                            <Popup className="custom-popup">
+                                                <div className="p-1">
+                                                    <h4 className="font-bold text-slate-900 text-xs mb-1">{int.name}</h4>
+                                                    <div className="flex justify-between text-[10px] text-slate-600 gap-2">
+                                                        <span>Vel: {int.speed} km/h</span>
+                                                        <span>Flujo: {int.flow} vpm</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => onSelectCamera(int.id)}
+                                                        className="mt-2 w-full bg-indigo-600 text-white text-[10px] py-1 rounded hover:bg-indigo-700"
+                                                    >
+                                                        Ver Cámara
+                                                    </button>
+                                                </div>
+                                            </Popup>
+                                        </Marker>
+                                    );
+                                })}
+                            </MapContainer>
+                        ) : (
+                            <iframe
+                                src="https://embed.waze.com/iframe?zoom=14&lat=-12.122&lon=-77.028&ct=livemap"
+                                width="100%"
+                                height="100%"
+                                allowFullScreen
+                                className="w-full h-full"
+                                style={{ border: 0 }}
+                            ></iframe>
+                        )}
+                    </div>
+                </div>
+
+                {/* Sidebar List */}
+                <div className="col-span-4 bg-slate-800 rounded-xl border border-slate-700 flex flex-col shadow-xl">
+                    <div className="p-4 border-b border-slate-700">
+                        <h3 className="font-bold text-white flex items-center gap-2">
+                            <Video size={18} className="text-indigo-400" />
+                            Cámaras Activas
+                        </h3>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                        {intersections.map((cam) => (
+                            <div key={cam.id}
+                                onClick={() => handleCameraSelect(cam.id)}
+                                className="bg-slate-700/50 p-4 rounded-lg border border-slate-600 hover:border-indigo-500 cursor-pointer transition-all hover:bg-slate-700 group"
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${cam.status === 'critical' ? 'bg-red-500 animate-pulse' : cam.status === 'moderate' ? 'bg-yellow-500' : 'bg-emerald-500'}`}></div>
+                                        <span className="font-medium text-white text-sm">{cam.name}</span>
                                     </div>
-                                    <div className="mt-2 text-[10px] text-indigo-300 bg-indigo-900/30 p-1 rounded">
-                                        Pred: {int.prediction}
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${cam.status === 'critical' ? 'bg-red-500/20 text-red-300' : cam.status === 'moderate' ? 'bg-yellow-500/20 text-yellow-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                                        {cam.status === 'critical' ? 'Crítico' : cam.status === 'moderate' ? 'Moderado' : 'Fluido'}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                                    <div className="flex items-center gap-1">
+                                        <Activity size={12} />
+                                        <span>{cam.flow} vpm</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <AlertTriangle size={12} />
+                                        <span>{cam.speed} km/h</span>
                                     </div>
                                 </div>
                             </div>
                         ))}
                     </div>
-
-                    {/* Controles Flotantes */}
-                    <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-                        <button className="p-2 bg-slate-900/90 text-white rounded hover:bg-indigo-600 transition-colors"><TrendingUp size={18} /></button>
-                        <button className="p-2 bg-slate-900/90 text-white rounded hover:bg-indigo-600 transition-colors"><Settings size={18} /></button>
-                    </div>
-                </Card>
-
-                {/* Lista Lateral */}
-                <div className="flex flex-col gap-4 h-full">
-                    <Card className="flex-1 flex flex-col">
-                        <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                            <Video size={16} className="text-indigo-400" /> Cámaras en Vivo
-                        </h3>
-                        <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
-                            {intersections.map((int) => (
-                                <div key={int.id}
-                                    className="p-3 bg-slate-900/50 rounded-lg border border-slate-800 hover:border-indigo-500/50 transition-colors cursor-pointer group"
-                                    onClick={() => onSelectCamera(int.id)}
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className="text-xs font-mono text-slate-500">{int.cam}</span>
-                                        <Badge status={int.status} />
-                                    </div>
-                                    <h4 className="text-sm font-semibold text-white mb-1">{int.name}</h4>
-                                    <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
-                                        <div
-                                            className={`h-full ${int.status === 'critical' ? 'bg-red-500' : 'bg-emerald-500'}`}
-                                            style={{ width: `${(int.flow / 60) * 100}%` }}
-                                        ></div>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 mt-1 text-right">{int.flow} vehículos/min</p>
-                                </div>
-                            ))}
-                        </div>
-                    </Card>
-
-                    <Card className="h-1/3 bg-slate-800/30">
-                        <h3 className="font-bold text-white mb-2 text-sm flex items-center gap-2">
-                            <AlertTriangle size={14} className="text-yellow-400" /> Alertas Recientes
-                        </h3>
-                        <div className="space-y-2">
-                            {alerts.map(alert => (
-                                <div key={alert.id} className="flex gap-2 items-start p-2 bg-slate-900/50 rounded border-l-2 border-yellow-500">
-                                    <div className="flex-1">
-                                        <p className="text-xs text-white">{alert.msg}</p>
-                                        <p className="text-[10px] text-slate-500">{alert.time}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </Card>
                 </div>
             </div>
         </div>

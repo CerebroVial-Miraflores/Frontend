@@ -14,7 +14,7 @@ const CerebroVialApp = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showThesis, setShowThesis] = useState(false);
   const [selectedAlertForReport, setSelectedAlertForReport] = useState<any>(null);
-  const [selectedCameraId, setSelectedCameraId] = useState<number | null>(null);
+  const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
